@@ -1,0 +1,92 @@
+# Default models and escalation ladders. Used to seed the database on first start.
+# Copy to config/config.yaml to customise the seed; after first start, manage
+# everything from the web console (Models & Ladders).
+#
+# ${VAR} and ${VAR:-default} are expanded from the environment / .env file.
+
+models:
+  # ---- local (no data leaves your network) ---------------------------------
+  - id: local-small
+    name: Local small (Ollama llama3.2 3B)
+    provider: ollama
+    model: llama3.2:3b
+    base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    location: local
+    options: {timeout: 180}
+
+  - id: local-medium
+    name: Local medium (Ollama qwen2.5 14B)
+    provider: ollama
+    model: qwen2.5:14b
+    base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    location: local
+    options: {timeout: 300}
+
+  # ---- cloud ---------------------------------------------------------------
+  - id: claude-haiku
+    name: Claude Haiku 5.5
+    provider: anthropic
+    model: claude-haiku-5-5
+    api_key_env: ANTHROPIC_API_KEY
+    location: cloud
+    cost_in: 0.10
+    cost_out: 0.50
+    options: {effort: medium}
+
+  - id: claude-sonnet
+    name: Claude Sonnet 5.5
+    provider: anthropic
+    model: claude-sonnet-5-5
+    api_key_env: ANTHROPIC_API_KEY
+    location: cloud
+    cost_in: 2.00
+    cost_out: 10.00
+    options: {effort: medium}
+
+  - id: claude-opus
+    name: Claude Opus 5.5
+    provider: anthropic
+    model: claude-opus-5-5
+    api_key_env: ANTHROPIC_API_KEY
+    location: cloud
+    cost_in: 4.00
+    cost_out: 20.00
+    options: {effort: high}
+
+ladders:
+  # Tiers run cheapest first. A tier is skipped automatically when its model is
+  # not available (no API key, Ollama not running), so this one ladder works
+  # local-only, cloud-only, or mixed.
+  #   max_complexity: highest triage complexity (1-5) this tier may start on
+  #   min_confidence: answers below this self-rated confidence escalate
+  - id: standard
+    name: Standard (local first, cloud escalation)
+    description: Small local model triages and answers the easy questions; harder or riskier work climbs to Claude.
+    tiers:
+      - {model: local-small,   max_complexity: 1, min_confidence: 80}
+      - {model: claude-haiku,  max_complexity: 2, min_confidence: 75}
+      - {model: claude-sonnet, max_complexity: 4, min_confidence: 70}
+      - {model: claude-opus,   max_complexity: 5, min_confidence: 0}
+    options:
+      triage: true
+      review: high_risk         # never | high_risk | always
+      high_risk_min_tier: 3     # config changes / high-risk work start no lower than this tier
+
+  - id: local-only
+    name: Local only (air-gapped)
+    description: Nothing leaves the network. Small model first, larger local model on escalation.
+    tiers:
+      - {model: local-small,  max_complexity: 2, min_confidence: 75}
+      - {model: local-medium, max_complexity: 5, min_confidence: 0}
+    options: {triage: true, review: high_risk, high_risk_min_tier: 2}
+
+  - id: cloud-only
+    name: Cloud only
+    description: Claude Haiku triages and answers simple requests; Sonnet and Opus take the rest.
+    tiers:
+      - {model: claude-haiku,  max_complexity: 2, min_confidence: 75}
+      - {model: claude-sonnet, max_complexity: 4, min_confidence: 70}
+      - {model: claude-opus,   max_complexity: 5, min_confidence: 0}
+    options: {triage: true, review: high_risk, high_risk_min_tier: 2}
+
+default_ladder: standard
