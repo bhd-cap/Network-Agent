@@ -1,7 +1,7 @@
 id: network-lead
 name: Network Lead (multi-vendor coordinator)
 description: Senior multi-vendor network engineer who takes unaddressed requests, solves cross-vendor problems and pulls in the Cisco, Fortinet and Arista specialists.
-color: "#7c5cff"
+color: "#00d4ff"
 coordinator: true
 skills: [network-core, device-access, collaboration]
 knowledge: [common, cisco, fortinet, arista]

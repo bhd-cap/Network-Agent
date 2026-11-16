@@ -5,7 +5,7 @@
 #   sudo cp /opt/netagent/scripts/netagent.service /etc/systemd/system/
 #   sudo systemctl enable --now netagent
 [Unit]
-Description=NetAgent multi-agent platform
+Description=BlackHawk NetAgent multi-agent platform
 After=network-online.target
 Wants=network-online.target
 

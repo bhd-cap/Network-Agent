@@ -1,4 +1,4 @@
-/* NetAgent console - pages. Each view fills `root`; assigning ctx.load makes it refresh on live events. */
+/* BlackHawk NetAgent console - pages. Each view fills `root`; assigning ctx.load makes it refresh on live events. */
 "use strict";
 
 function pageHead(title, subtitle, ...actions) {
@@ -408,7 +408,7 @@ views.profiles = async (root, args, ctx) => {
 
 async function profileDialog(profile, ctx, editable = true) {
   const [catalog, ladders] = await Promise.all([api("/skills"), api("/ladders")]);
-  const p = profile || { skills: ["network-core", "collaboration"], knowledge: ["common"], keywords: [], color: "#2f6feb" };
+  const p = profile || { skills: ["network-core", "collaboration"], knowledge: ["common"], keywords: [], color: "#0047ab" };
   const form = buildForm([
     { key: "name", label: "Profile name", placeholder: "e.g. Wireless Engineer" },
     { key: "description", label: "One-line description", help: "Shown to people and to other agents deciding whom to consult." },
@@ -416,7 +416,7 @@ async function profileDialog(profile, ctx, editable = true) {
     { key: "system_prompt", label: "Brief (instructions)", type: "textarea", rows: 9, placeholder: "What this agent is responsible for and how it should approach the work." },
     { key: "keywords", label: "Routing keywords", help: "Comma separated. Unaddressed tasks containing these words are routed to agents with this profile." },
     { key: "ladder_id", label: "Model ladder", type: "select", half: true, options: [["", "Default ladder"], ...ladders.map((l) => [l.id, l.name])] },
-    { key: "color", label: "Colour", half: true, placeholder: "#2f6feb" },
+    { key: "color", label: "Colour", half: true, placeholder: "#0047ab" },
     { key: "coordinator", label: "Coordinator", type: "bool", help: "receives tasks that match no specialist" },
   ], { ...p, keywords: (p.keywords || []).join(", ") });
   const boxes = (items, chosen, describe) => items.map((item) => {

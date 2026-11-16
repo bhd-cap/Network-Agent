@@ -123,7 +123,7 @@ def digest_markdown(rt: "Runtime", days: int = 1) -> str:
     t = s["totals"]
     period = "last 24 hours" if days == 1 else f"last {days} days"
     lines = [
-        f"# NetAgent report - {period}", "",
+        f"# BlackHawk NetAgent report - {period}", "",
         f"- Tasks: **{t['tasks']}** ({t['top_level']} requests, {t['sub_tasks']} agent sub-tasks)",
         f"- Completed: **{t['completed']}**, failed: **{t['failed']}**, open: **{t['open']}**",
         f"- Flagged for human review: **{t['needs_review']}**",

@@ -1,4 +1,4 @@
-/* NetAgent console - core: helpers, API client, router, live updates. No build step. */
+/* BlackHawk NetAgent console - core: helpers, API client, router, live updates. No build step. */
 "use strict";
 
 const $ = (sel, root = document) => root.querySelector(sel);

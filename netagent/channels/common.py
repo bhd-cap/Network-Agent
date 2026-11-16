@@ -8,7 +8,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from ..runtime import Runtime
 
 HELP = (
-    "**NetAgent** - send me a question or a task and an agent will pick it up.\n\n"
+    "**BlackHawk NetAgent** - send me a question or a task and an agent will pick it up.\n\n"
     "- `agents` - list the agents and what they do\n"
     "- `tasks` - show open tasks\n"
     "- `status <id>` - status and result of a task\n"

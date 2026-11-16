@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "netagent"
 version = "0.1.0"
-description = "Multi-agent AI platform with local/cloud model escalation - first profiles: Cisco, Fortinet and Arista network experts"
+description = "BlackHawk NetAgent: multi-agent AI platform with local/cloud model escalation - first profiles: Cisco, Fortinet and Arista network experts"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -30,7 +30,7 @@ netagent = "netagent.__main__:main"
 packages = ["netagent", "netagent.models", "netagent.tools", "netagent.channels", "netagent.api"]
 
 [tool.setuptools.package-data]
-netagent = ["web/*", "defaults.yaml"]
+netagent = ["web/*", "web/brand/*", "defaults.yaml"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

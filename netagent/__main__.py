@@ -8,7 +8,7 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="netagent", description="NetAgent multi-agent platform")
+    parser = argparse.ArgumentParser(prog="netagent", description="BlackHawk NetAgent multi-agent platform")
     sub = parser.add_subparsers(dest="command")
     serve = sub.add_parser("serve", help="run the service (default)")
     serve.add_argument("--host")
@@ -45,7 +45,8 @@ def main(argv: list[str] | None = None) -> int:
 
     host = getattr(args, "host", None) or settings.host
     port = getattr(args, "port", None) or settings.port
-    print(f"\n  NetAgent console:  http://{'localhost' if host in ('0.0.0.0', '::') else host}:{port}")
+    print("\n  BlackHawk NetAgent")
+    print(f"  Console:           http://{'localhost' if host in ('0.0.0.0', '::') else host}:{port}")
     if os.environ.get("NETAGENT_ADMIN_TOKEN", "").strip():
         print("  Admin token:       set by NETAGENT_ADMIN_TOKEN")
     else:  # generated on first start: show it so the operator can sign in

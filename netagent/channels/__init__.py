@@ -183,7 +183,7 @@ class ChannelManager:
             else:
                 text = "\n".join([title, "", *[f"{k}: {v}" for k, v in facts if v], "", body, "", url])
                 try:
-                    await self.email.send(recipients, f"[NetAgent] {title}", text)
+                    await self.email.send(recipients, f"[BlackHawk NetAgent] {title}", text)
                 except Exception as exc:
                     problems.append(f"Email: {exc}")
         self.last_notify_error = "; ".join(problems)
@@ -271,7 +271,7 @@ class ChannelManager:
             return await self.teams.test()
         if name == "email":
             return await self.email.test()
-        problems = await self.broadcast("Test notification", [("Source", "NetAgent console")],
+        problems = await self.broadcast("Test notification", [("Source", "BlackHawk NetAgent console")],
                                         "If you can read this, notifications are working.", self.rt.settings.public_url)
         cfg = self.get_config("notifications")
         if not (cfg.get("teams_webhook_url") or cfg.get("email_recipients")):

@@ -238,7 +238,7 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
         finally:
             await app.state.rt.stop()
 
-    app = FastAPI(title="NetAgent", version=__version__, lifespan=lifespan, docs_url="/api/docs", redoc_url=None,
+    app = FastAPI(title="BlackHawk NetAgent", version=__version__, lifespan=lifespan, docs_url="/api/docs", redoc_url=None,
                   openapi_url="/api/openapi.json")
     failed_logins: dict[str, list[float]] = {}
 

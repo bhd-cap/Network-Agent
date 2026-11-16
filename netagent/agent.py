@@ -32,7 +32,7 @@ class Attempt:
 def build_system_prompt(agent: dict, profile: dict, tools: list[Tool], final_tier: bool, tools_enabled: bool) -> str:
     skills = set(profile.get("skills") or [])
     parts = [
-        f"You are {agent['name']}, an AI agent on the NetAgent platform.",
+        f"You are {agent['name']}, an AI agent on the BlackHawk NetAgent platform.",
         f"Profile: {profile['name']} - {profile.get('description', '')}".rstrip(" -"),
         f"Agent role: {'coordinator' if profile.get('coordinator') else 'specialist'}",
     ]

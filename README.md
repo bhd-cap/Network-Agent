@@ -1,4 +1,11 @@
-# NetAgent
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="netagent/web/brand/logo-dark.png">
+    <img src="netagent/web/brand/logo-light.png" alt="BlackHawk Data" width="360">
+  </picture>
+</p>
+
+# BlackHawk NetAgent
 
 A self-hosted multi-agent AI platform. Agents take work from Microsoft Teams, email, a REST API or the web
 console, answer with small fast models where they can, and escalate to larger models only when the task
