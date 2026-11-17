@@ -1,0 +1,35 @@
+# docker compose up -d                      -> NetAgent only (cloud models, or Ollama running elsewhere)
+# docker compose --profile local up -d      -> NetAgent + a local Ollama runtime
+services:
+  netagent:
+    build: .
+    image: netagent:latest
+    restart: unless-stopped
+    ports:
+      - "${NETAGENT_PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NETAGENT_DATA_DIR: /data
+      # Inside compose, Ollama is reachable by service name. Override in .env for a remote runtime.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+    volumes:
+      - netagent-data:/data
+      # Drop your own profiles / playbooks in these folders to extend the agents:
+      - ./profiles:/app/profiles:ro
+      - ./knowledge:/app/knowledge:ro
+
+  ollama:
+    profiles: ["local"]
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    # After first start, pull the models the ladder uses:
+    #   docker compose exec ollama ollama pull llama3.2:3b
+    #   docker compose exec ollama ollama pull qwen2.5:14b
+
+volumes:
+  netagent-data:
+  ollama-models:

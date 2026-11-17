@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BlackHawk NetAgent Console</title>
+  <link rel="icon" type="image/png" href="/static/brand/icon.png">
+  <link rel="apple-touch-icon" href="/static/brand/icon.png">
+  <meta name="theme-color" content="#000811">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div id="login" class="login" hidden>
+    <form class="login-card" id="login-form">
+      <div class="login-brand">
+        <img class="logo-on-light" src="/static/brand/logo-light.png" alt="BlackHawk Data" width="250" height="15">
+        <img class="logo-on-dark" src="/static/brand/logo-dark.png" alt="BlackHawk Data" width="250" height="15">
+        <span class="product">NetAgent</span>
+      </div>
+      <p class="muted">Sign in with the admin token printed when the service starts
+        (<code>netagent token</code>).</p>
+      <label>Admin token
+        <input type="password" id="login-token" autocomplete="current-password" required>
+      </label>
+      <div class="error" id="login-error" hidden></div>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <div id="app" class="app" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#/dashboard">
+        <img src="/static/brand/logo-dark.png" alt="BlackHawk Data" width="172" height="10">
+        <span class="product">NetAgent</span>
+      </a>
+      <div class="brand-rule"></div>
+      <nav id="nav"></nav>
+      <div class="sidebar-foot">
+        <div id="conn" class="conn"><span class="dot"></span><span id="conn-text">connecting</span></div>
+        <button class="link" id="theme-toggle" type="button">Toggle theme</button>
+        <button class="link" id="logout" type="button">Sign out</button>
+        <div class="muted small" id="version"></div>
+      </div>
+    </aside>
+    <main>
+      <div id="demo-banner" class="banner" hidden>
+        Demo mode: answers come from offline mock models and devices are simulated.
+        Add real models under <a href="#/models">Models &amp; Ladders</a>.
+      </div>
+      <div id="view"></div>
+    </main>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toasts" aria-live="polite"></div>
+  <script src="/static/app.js"></script>
+  <script src="/static/views.js"></script>
+</body>
+</html>
