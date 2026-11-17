@@ -1,25 +1,28 @@
-# systemd unit for Linux.
-#   sudo useradd --system --home /opt/netagent netagent
-#   sudo cp -r . /opt/netagent && sudo chown -R netagent /opt/netagent
-#   sudo -u netagent /opt/netagent/scripts/install.sh
-#   sudo cp /opt/netagent/scripts/netagent.service /etc/systemd/system/
-#   sudo systemctl enable --now netagent
+# systemd unit for BlackHawk NetAgent. Installed by scripts/install-service.sh, which also creates the
+# layout it expects:
+#   /opt/netagent                  code and Python virtualenv (owned by root, read-only to the service)
+#   /etc/netagent/netagent.env     settings and secrets (root:netagent, 0640)
+#   /var/lib/netagent              database, generated admin token and encryption key (netagent, 0750)
 [Unit]
 Description=BlackHawk NetAgent multi-agent platform
+Documentation=https://github.com/bhd-cap/Network-Agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=netagent
+Group=netagent
 WorkingDirectory=/opt/netagent
-EnvironmentFile=-/opt/netagent/.env
+Environment=NETAGENT_DATA_DIR=/var/lib/netagent
+EnvironmentFile=/etc/netagent/netagent.env
 ExecStart=/opt/netagent/.venv/bin/python -m netagent serve
 Restart=on-failure
 RestartSec=5
+UMask=0077
+# Only hardening that needs no extra kernel namespaces, so the unit also starts in LXC containers
+# created without nesting. The service already runs unprivileged against root-owned code.
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
 
 [Install]
 WantedBy=multi-user.target

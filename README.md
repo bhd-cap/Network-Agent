@@ -77,12 +77,68 @@ triage, the tool calls and the change request appear.
 
 | Run as a service | How |
 |---|---|
-| Linux | `scripts/netagent.service` (systemd unit, instructions inside) |
+| Proxmox VE (LXC) | `deploy/proxmox/netagent-lxc.sh create` on the Proxmox host - see [Proxmox VE](#proxmox-ve-lxc) |
+| Debian / Ubuntu | `sudo ./scripts/install-service.sh` (systemd service; re-run to upgrade) |
 | Windows | `scripts\install-windows-service.ps1` (Task Scheduler, starts at boot) |
 | Docker | `docker compose up -d` (restarts automatically, data in the `netagent-data` volume) |
 
 Put a TLS-terminating reverse proxy in front for anything beyond a lab, and set `NETAGENT_PUBLIC_URL` to
 the external address (it is used in Teams/email links and webhook URLs).
+
+### Debian / Ubuntu service
+
+`scripts/install-service.sh` installs NetAgent as a systemd service on Debian 12+ or Ubuntu 22.04+ - bare
+metal, VM or container. Run it as root from a copy of the repository; re-running it upgrades in place and
+keeps settings and data.
+
+```bash
+sudo ./scripts/install-service.sh                  # install or upgrade
+sudo ./scripts/install-service.sh --demo           # try it with mock models and simulated devices
+sudo ./scripts/install-service.sh --port 8443 --public-url https://netagent.example.com
+sudo ./scripts/install-service.sh --ca-cert corp-ca.pem   # behind a TLS-inspecting proxy
+sudo ./scripts/install-service.sh --uninstall [--purge]
+```
+
+| Path | Contents |
+|---|---|
+| `/opt/netagent` | Code and Python virtualenv, owned by root (the service cannot modify it) |
+| `/etc/netagent/netagent.env` | Settings and API keys (`root:netagent`, `0640`). Restart after editing: `systemctl restart netagent` |
+| `/var/lib/netagent` | Database, generated sign-in token and the credential encryption key - back this up |
+
+The service runs as the unprivileged `netagent` user. `netagent token` prints the sign-in token and
+`netagent create-key NAME` creates an API key; logs are in `journalctl -u netagent`. `--ca-cert` adds the CA to
+the system trust store and points the service's HTTP clients at it, which the Teams, Graph and Ollama
+connections need behind TLS inspection.
+
+### Proxmox VE (LXC)
+
+NetAgent needs no special LXC build: it runs in a standard Debian container. The host script creates that
+container and runs the installer above inside it. On the Proxmox host, as root, from a copy of this
+repository:
+
+```bash
+./deploy/proxmox/netagent-lxc.sh create                          # DHCP on vmbr0, next free ID
+./deploy/proxmox/netagent-lxc.sh create --ctid 210 --hostname netagent \
+    --ip 10.10.20.50/24 --gw 10.10.20.1 --vlan 20 --memory 4096
+./deploy/proxmox/netagent-lxc.sh create --dry-run                # show the pct commands only
+./deploy/proxmox/netagent-lxc.sh upgrade 210                     # push new code, keep data
+```
+
+It downloads the Debian template if needed (Debian 13 on Proxmox VE 9, Debian 12 on 8.x; override with
+`--debian`) and creates an **unprivileged** container with `nesting=1` (2 cores, 2 GB RAM and an 8 GB disk by
+default; it picks `local-lvm` or `local-zfs` storage unless you pass `--storage`). The container starts at boot.
+Use a static IP, or a DHCP reservation, so the console URL and Teams/webhook addresses stay valid. All
+options: `--help`.
+
+- **Back up** with `vzdump <ctid>` or a Proxmox Backup Server job: the database and its encryption key live
+  inside the container.
+- **Local models**: the 2 GB default is sized for NetAgent with cloud models. For Ollama, either run it on a
+  GPU host or VM and set `OLLAMA_BASE_URL` in `/etc/netagent/netagent.env`, or install it in the container
+  (`curl -fsSL https://ollama.com/install.sh | sh`, then `ollama pull llama3.2:3b`) after giving the
+  container at least 4 cores, 8 GB RAM and 30 GB disk. CPU-only inference is slow; GPU passthrough to an
+  LXC is possible but host-specific.
+- **Docker inside LXC** works with `nesting=1,keyctl=1` but adds a layer for no benefit here; Proxmox
+  recommends a VM for Docker. Use the native install.
 
 ## Models and the escalation ladder
 
@@ -289,5 +345,7 @@ netagent/
   web/             console (static HTML/CSS/JS, no build step)
   reports.py       summaries, per-task reports, CSV
 profiles/          built-in agent profiles (YAML)
+deploy/proxmox/    Proxmox VE host script (create/upgrade an LXC)
+scripts/           installers and service definitions (Linux, Windows)
 knowledge/         playbook library (Markdown)
 ```
