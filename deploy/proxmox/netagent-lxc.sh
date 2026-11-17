@@ -99,7 +99,7 @@ install_into() {
   local quoted; quoted="$(printf ' %q' "${args[@]}")"
   run pct exec "$ctid" -- bash -c "set -e; rm -rf /root/netagent-src; mkdir -p /root/netagent-src; \
 tar -xzf /root/netagent-src.tar.gz -C /root/netagent-src; rm -f /root/netagent-src.tar.gz; \
-/root/netagent-src/scripts/install-service.sh${quoted}"
+bash /root/netagent-src/scripts/install-service.sh${quoted}"
 }
 
 # ------------------------------------------------------------------------------------------- upgrade

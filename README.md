@@ -124,6 +124,22 @@ repository:
 ./deploy/proxmox/netagent-lxc.sh upgrade 210                     # push new code, keep data
 ```
 
+The script needs a copy of this repository on the Proxmox host. It does not need to be a git checkout, and
+the container itself never contacts GitHub: the script packs up the folder it runs from and pushes it into
+the container. Either way works:
+
+```bash
+# Git (the repository is private: authenticate with a read-only token or a deploy key)
+apt install -y git
+git clone https://github.com/bhd-cap/Network-Agent.git /root/netagent && cd /root/netagent
+./deploy/proxmox/netagent-lxc.sh create
+# later: git pull && ./deploy/proxmox/netagent-lxc.sh upgrade <ctid>
+
+# No git on the host: copy a downloaded or local copy across, then run it from there
+scp -r Network-Agent root@pve:/root/netagent
+ssh root@pve 'bash /root/netagent/deploy/proxmox/netagent-lxc.sh create'
+```
+
 It downloads the Debian template if needed (Debian 13 on Proxmox VE 9, Debian 12 on 8.x; override with
 `--debian`) and creates an **unprivileged** container with `nesting=1` (2 cores, 2 GB RAM and an 8 GB disk by
 default; it picks `local-lvm` or `local-zfs` storage unless you pass `--storage`). The container starts at boot.

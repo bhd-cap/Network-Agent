@@ -1,0 +1,5 @@
+# Shell scripts and the systemd unit run on Linux even when the repository is checked out on Windows.
+*.sh       text eol=lf
+*.service  text eol=lf
+# PowerShell scripts are for Windows.
+*.ps1      text eol=crlf
