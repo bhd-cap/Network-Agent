@@ -155,6 +155,20 @@ options: `--help`.
   LXC is possible but host-specific.
 - **Docker inside LXC** works with `nesting=1,keyctl=1` but adds a layer for no benefit here; Proxmox
   recommends a VM for Docker. Use the native install.
+- **ARM hosts** (arm64 builds of Proxmox): the script picks the Debian template for the host's CPU, and every
+  Python dependency ships an arm64 wheel, so nothing is compiled.
+
+**If the container will not start**, the script prints the errors from LXC's debug log and the likely
+cause, then stops so you can remove the container (`pct destroy <ctid>`) and retry. The usual fixes:
+
+| LXC error mentions | Retry with |
+|---|---|
+| `memory` controller or `memory.swap.max` | `--swap 0`; if that is not enough, enable the memory cgroup on the host kernel command line (for example `cgroup_enable=memory`) and reboot - common on ARM boards |
+| AppArmor | check `systemctl status apparmor` on the host, or `--no-nesting` |
+| a refused mount | `--no-nesting` |
+
+To read the log yourself: `lxc-start -n <ctid> -F -l DEBUG -o /tmp/lxc-<ctid>.log`, then
+`grep ERROR /tmp/lxc-<ctid>.log`.
 
 ## Models and the escalation ladder
 
