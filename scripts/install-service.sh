@@ -95,11 +95,18 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' \
 if [ -n "$CA_CERT" ]; then
   [ -f "$CA_CERT" ] || die "CA certificate not found: $CA_CERT"
   say "Adding CA certificate to the system trust store"
-  install -m 0644 "$CA_CERT" /usr/local/share/ca-certificates/netagent-extra-ca.crt
+  grep -q -- '-----BEGIN CERTIFICATE-----' "$CA_CERT" || die "$CA_CERT is not a PEM certificate (convert DER with: openssl x509 -inform der -in FILE -out FILE.pem)"
+  # One certificate per file: update-ca-certificates links each file individually.
+  rm -f /usr/local/share/ca-certificates/netagent-extra-ca*.crt
+  awk '/-----BEGIN CERTIFICATE-----/ { n++; f = sprintf("/usr/local/share/ca-certificates/netagent-extra-ca-%03d.crt", n) }
+       f { print > f }
+       /-----END CERTIFICATE-----/ { close(f); f = "" }' "$CA_CERT"
+  chmod 0644 /usr/local/share/ca-certificates/netagent-extra-ca*.crt
   update-ca-certificates >/dev/null
 fi
 SYSTEM_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-if [ -n "$CA_CERT" ] || [ -f /usr/local/share/ca-certificates/netagent-extra-ca.crt ]; then
+EXTRA_CA="$(compgen -G '/usr/local/share/ca-certificates/netagent-extra-ca*.crt' || true)"
+if [ -n "$EXTRA_CA" ]; then
   export PIP_CERT="$SYSTEM_BUNDLE"  # pip uses its own bundle unless told otherwise
 fi
 
@@ -174,7 +181,7 @@ elif [ "$PORT" != "$OLD_PORT" ] && [[ "$CURRENT_URL" =~ ^http://[^/]+:${OLD_PORT
 fi
 [ "$DEMO" = "1" ] && set_env NETAGENT_DEMO 1
 [ "$DEMO" = "0" ] && sed -i -E 's/^NETAGENT_DEMO=.*/#NETAGENT_DEMO=1/' "$ENV_FILE"
-if [ -f /usr/local/share/ca-certificates/netagent-extra-ca.crt ]; then
+if [ -n "$EXTRA_CA" ]; then
   # Python HTTP clients use their own CA bundle by default; point them at the system one.
   set_env SSL_CERT_FILE "$SYSTEM_BUNDLE"
   set_env REQUESTS_CA_BUNDLE "$SYSTEM_BUNDLE"
