@@ -13,6 +13,7 @@
 #   --cores N             CPU cores (default: 2)
 #   --memory MB           Memory in MB (default: 2048)
 #   --disk GB             Root disk size in GB (default: 8)
+#   --swap MB             Swap in MB (default: 512; use 0 if the host kernel has no swap accounting)
 #   --storage NAME        Storage for the root disk (default: local-lvm, else local-zfs, else first that fits)
 #   --template-storage N  Storage for the Debian template (default: local)
 #   --debian 12|13        Debian release (default: 13 on Proxmox VE 9+, otherwise 12)
@@ -24,13 +25,14 @@
 #   --public-url URL      External URL for Teams/email links (default: http://<container IP>:<port>)
 #   --ssh-key FILE        Public key file to authorise for root SSH into the container
 #   --ca-cert FILE        Extra CA certificate to trust (TLS-inspecting proxy)
+#   --no-nesting          Create the container without nesting (only if it will not start with it)
 #   --demo                Start in demo mode (mock models, simulated devices)
 #   --dry-run             Print the Proxmox commands without running them
 #   -h, --help            Show this help
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CTID="" HOSTNAME_="netagent" CORES=2 MEMORY=2048 SWAP=512 DISK=8 STORAGE="" TSTORAGE="local" DEBIAN=""
+CTID="" HOSTNAME_="netagent" CORES=2 MEMORY=2048 SWAP=512 DISK=8 STORAGE="" TSTORAGE="local" DEBIAN="" NESTING=1
 BRIDGE="vmbr0" VLAN="" IP="dhcp" GW="" PORT=8080 PUBLIC_URL="" SSH_KEY="" CA_CERT="" DEMO=0 DRY_RUN=0
 
 say()  { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
@@ -70,6 +72,8 @@ while [ $# -gt 0 ]; do
     --public-url) PUBLIC_URL="$2"; shift 2 ;;
     --ssh-key) SSH_KEY="$2"; shift 2 ;;
     --ca-cert) CA_CERT="$2"; shift 2 ;;
+    --swap) SWAP="$2"; shift 2 ;;
+    --no-nesting) NESTING=0; shift ;;
     --demo) DEMO=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage 0 ;;
@@ -80,9 +84,44 @@ done
 [ "$(id -u)" -eq 0 ] || [ "$DRY_RUN" -eq 1 ] || die "run as root on the Proxmox VE host"
 command -v pct >/dev/null || die "pct not found: run this on a Proxmox VE host"
 [ -f "$SRC_DIR/scripts/install-service.sh" ] || die "repository not found next to this script ($SRC_DIR)"
-for n in "$CORES" "$MEMORY" "$DISK" "$PORT"; do [[ "$n" =~ ^[0-9]+$ ]] || die "expected a number, got '$n'"; done
+for n in "$CORES" "$MEMORY" "$DISK" "$SWAP" "$PORT"; do [[ "$n" =~ ^[0-9]+$ ]] || die "expected a number, got '$n'"; done
 [ -z "$CA_CERT" ] || [ -f "$CA_CERT" ] || die "CA certificate not found: $CA_CERT"
 [ -z "$SSH_KEY" ] || [ -f "$SSH_KEY" ] || die "SSH key file not found: $SSH_KEY"
+
+# A container that will not start says why only in LXC's debug log. Capture it and explain the usual causes.
+explain_start_failure() {
+  local ctid="$1" log="/tmp/netagent-lxc-$1-start.log"
+  printf '\n\033[1;31mContainer %s was created but LXC could not start it.\033[0m Collecting the LXC debug log...\n' "$ctid" >&2
+  rm -f "$log"
+  if timeout 90 lxc-start -n "$ctid" -l DEBUG -o "$log" >/dev/null 2>&1 && pct status "$ctid" | grep -q running; then
+    say "It started on a second attempt; continuing"
+    return 0
+  fi
+  if [ -s "$log" ]; then
+    printf '\nErrors from %s:\n' "$log" >&2
+    grep -E ' (ERROR|WARN) ' "$log" | sed -E 's/^.* (ERROR|WARN) +/  \1 /' | tail -n 20 >&2
+  fi
+  # Debug logs mention AppArmor, ID maps and mounts on every start; only ERROR lines say what failed.
+  local errors; errors="$(grep -E ' ERROR ' "$log" 2>/dev/null || true)"
+  printf '\nLikely cause:\n' >&2
+  if grep -qiE 'apparmor' <<<"$errors"; then
+    printf '  AppArmor on the host. Check: systemctl status apparmor; aa-status. Or retry with --no-nesting.\n' >&2
+  elif grep -qiE 'memory\.(swap\.)?max|memory\.limit|"memory" controller|swap' <<<"$errors"; then
+    printf '  The host kernel lacks memory cgroup or swap accounting (common on ARM boards).\n' >&2
+    printf '  Retry with --swap 0; if it still fails, enable the memory cgroup on the host kernel command line\n' >&2
+    printf '  (for example cgroup_enable=memory) and reboot.\n' >&2
+  elif grep -qiE 'newuidmap|newgidmap|idmap|subuid|subgid' <<<"$errors"; then
+    printf '  User ID mapping for unprivileged containers. /etc/subuid and /etc/subgid need: root:100000:65536\n' >&2
+  elif grep -qiE 'mount|proc/sys|sysfs|nesting|Operation not permitted' <<<"$errors"; then
+    printf '  A mount the container needs was refused by the host kernel. Retry with --no-nesting.\n' >&2
+  else
+    printf '  Not recognised. Check whether any unprivileged container starts on this host:\n' >&2
+    printf '    pct create 9999 %s --unprivileged 1 && pct start 9999; pct destroy 9999\n' "${TSTORAGE}:vztmpl/${TEMPLATE:-<template>}" >&2
+  fi
+  printf '\nRemove the failed container before retrying:  pct destroy %s\n' "$ctid" >&2
+  printf 'Full log: %s  (attach it when asking for help)\n' "$log" >&2
+  return 1
+}
 
 # Copy the repository into the container and run the installer there.
 install_into() {
@@ -99,13 +138,13 @@ install_into() {
   local quoted; quoted="$(printf ' %q' "${args[@]}")"
   run pct exec "$ctid" -- bash -c "set -e; rm -rf /root/netagent-src; mkdir -p /root/netagent-src; \
 tar -xzf /root/netagent-src.tar.gz -C /root/netagent-src; rm -f /root/netagent-src.tar.gz; \
-/root/netagent-src/scripts/install-service.sh${quoted}"
+bash /root/netagent-src/scripts/install-service.sh${quoted}"
 }
 
 # ------------------------------------------------------------------------------------------- upgrade
 if [ "$ACTION" = "upgrade" ]; then
   pct status "$CTID" >/dev/null 2>&1 || die "container $CTID does not exist"
-  pct status "$CTID" | grep -q running || run pct start "$CTID"
+  if ! pct status "$CTID" | grep -q running && ! run pct start "$CTID"; then explain_start_failure "$CTID" || exit 1; fi
   say "Upgrading NetAgent in container $CTID (settings and data are kept)"
   install_into "$CTID"
   exit 0
@@ -137,8 +176,12 @@ fi
 
 say "Finding the Debian $DEBIAN container template"
 run pveam update >/dev/null || true
-TEMPLATE="$(pveam available --section system | awk -v d="debian-$DEBIAN-standard" '$2 ~ "^"d {print $2}' | sort -V | tail -n 1)"
-[ -n "$TEMPLATE" ] || die "no debian-$DEBIAN-standard template is offered by pveam on this host"
+ARCH="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
+TEMPLATES="$(pveam available --section system | awk -v d="debian-$DEBIAN-standard" '$2 ~ "^"d {print $2}')"
+# Prefer a template built for this host's CPU (amd64 or arm64); fall back to names without an architecture.
+TEMPLATE="$(grep -E "_${ARCH}\." <<<"$TEMPLATES" | sort -V | tail -n 1 || true)"
+[ -n "$TEMPLATE" ] || TEMPLATE="$(grep -vE '_(amd64|arm64|i386|armhf|riscv64)\.' <<<"$TEMPLATES" | sort -V | tail -n 1 || true)"
+[ -n "$TEMPLATE" ] || die "no debian-$DEBIAN-standard template for $ARCH is offered by pveam on this host"
 if pveam list "$TSTORAGE" | awk '{print $1}' | grep -q "/$TEMPLATE\$"; then
   say "Template $TEMPLATE already downloaded"
 else
@@ -152,13 +195,13 @@ NET="name=eth0,bridge=$BRIDGE,ip=$IP"
 CREATE=(pct create "$CTID" "$TSTORAGE:vztmpl/$TEMPLATE"
   --hostname "$HOSTNAME_" --cores "$CORES" --memory "$MEMORY" --swap "$SWAP"
   --rootfs "$STORAGE:$DISK" --net0 "$NET" --ostype debian
-  --unprivileged 1 --features nesting=1 --onboot 1 --timezone host
+  --unprivileged 1 --features "nesting=$NESTING" --onboot 1 --timezone host
   --tags netagent --description "BlackHawk NetAgent - console on port $PORT")
 [ -n "$SSH_KEY" ] && CREATE+=(--ssh-public-keys "$SSH_KEY")
 
-say "Creating container $CTID ($HOSTNAME_: $CORES cores, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE, $BRIDGE $IP)"
+say "Creating container $CTID ($HOSTNAME_, $ARCH: $CORES cores, ${MEMORY} MB RAM, ${DISK} GB on $STORAGE, $BRIDGE $IP)"
 run "${CREATE[@]}"
-run pct start "$CTID"
+if ! run pct start "$CTID"; then explain_start_failure "$CTID" || exit 1; fi
 
 if [ "$DRY_RUN" -eq 0 ]; then
   say "Waiting for the container network"

@@ -124,6 +124,22 @@ repository:
 ./deploy/proxmox/netagent-lxc.sh upgrade 210                     # push new code, keep data
 ```
 
+The script needs a copy of this repository on the Proxmox host. It does not need to be a git checkout, and
+the container itself never contacts GitHub: the script packs up the folder it runs from and pushes it into
+the container. Either way works:
+
+```bash
+# Git (the repository is private: authenticate with a read-only token or a deploy key)
+apt install -y git
+git clone https://github.com/bhd-cap/Network-Agent.git /root/netagent && cd /root/netagent
+./deploy/proxmox/netagent-lxc.sh create
+# later: git pull && ./deploy/proxmox/netagent-lxc.sh upgrade <ctid>
+
+# No git on the host: copy a downloaded or local copy across, then run it from there
+scp -r Network-Agent root@pve:/root/netagent
+ssh root@pve 'bash /root/netagent/deploy/proxmox/netagent-lxc.sh create'
+```
+
 It downloads the Debian template if needed (Debian 13 on Proxmox VE 9, Debian 12 on 8.x; override with
 `--debian`) and creates an **unprivileged** container with `nesting=1` (2 cores, 2 GB RAM and an 8 GB disk by
 default; it picks `local-lvm` or `local-zfs` storage unless you pass `--storage`). The container starts at boot.
@@ -139,6 +155,20 @@ options: `--help`.
   LXC is possible but host-specific.
 - **Docker inside LXC** works with `nesting=1,keyctl=1` but adds a layer for no benefit here; Proxmox
   recommends a VM for Docker. Use the native install.
+- **ARM hosts** (arm64 builds of Proxmox): the script picks the Debian template for the host's CPU, and every
+  Python dependency ships an arm64 wheel, so nothing is compiled.
+
+**If the container will not start**, the script prints the errors from LXC's debug log and the likely
+cause, then stops so you can remove the container (`pct destroy <ctid>`) and retry. The usual fixes:
+
+| LXC error mentions | Retry with |
+|---|---|
+| `memory` controller or `memory.swap.max` | `--swap 0`; if that is not enough, enable the memory cgroup on the host kernel command line (for example `cgroup_enable=memory`) and reboot - common on ARM boards |
+| AppArmor | check `systemctl status apparmor` on the host, or `--no-nesting` |
+| a refused mount | `--no-nesting` |
+
+To read the log yourself: `lxc-start -n <ctid> -F -l DEBUG -o /tmp/lxc-<ctid>.log`, then
+`grep ERROR /tmp/lxc-<ctid>.log`.
 
 ## Models and the escalation ladder
 
